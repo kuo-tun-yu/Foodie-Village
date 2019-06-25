@@ -1,0 +1,209 @@
+# Lasso
+
+
+## 匯入資料(2選1就好)
+### 1.連MySQL
+```{r}
+library(RMySQL)
+library(DBI)
+library(pool)
+engine <- dbConnect(RMySQL::MySQL(),
+                    host = "192.168.35.119",
+                    port = 3306,
+                    dbname = "dcard_db",
+                    user = "derek",
+                    password = "derek"
+)
+
+dbSendQuery(engine, 'set character set "Big5"'); #要先Send才能下一行的Get
+
+Dcard1 <- dbGetQuery(engine,'select * from dcard_content;') #GetQuery得到dataframe
+
+```
+
+### 2.讀CSV
+```{r}
+Dcard1 <- read.csv("C:/Users/Student/Desktop/5-模型建立/RawData/DcardContent.csv")
+```
+
+### 只留要用的欄位
+```{r}
+Dcard2 = Dcard1[ ,c(3,4,5,6,7,8,12,15,16)]
+rm(engine,Dcard1)
+```
+
+## 欄位處理
+### 把time這欄換成上午 下午 晚上 半夜
+```{r}
+#把time欄位轉成時段 上午下午晚上半夜
+Dcard2$time = substr(Dcard2$time ,1,2)
+Dcard2$time = as.character(Dcard2$time)
+b1=which(Dcard2$time=='07' |Dcard2$time=='08'|Dcard2$time=='09'|Dcard2$time=='10'|Dcard2$time=='11'|Dcard2$time=='12' )
+Dcard2[b1,'time']='上午' 
+
+b2=which(Dcard2$time=='13' |Dcard2$time=='14'|Dcard2$time=='15'|Dcard2$time=='16'|Dcard2$time=='17'|Dcard2$time=='18' )
+Dcard2[b2,'time']='下午' 
+
+b3=which(Dcard2$time=='19' |Dcard2$time=='20'|Dcard2$time=='21'|Dcard2$time=='22'|Dcard2$time=='23'|Dcard2$time=='00' )
+Dcard2[b3,'time']='晚上' 
+
+b4=which(Dcard2$time=='01' |Dcard2$time=='02'|Dcard2$time=='03'|Dcard2$time=='04'|Dcard2$time=='05'|Dcard2$time=='06' )
+Dcard2[b4,'time']='半夜' 
+rm(b1,b2,b3,b4)
+```
+
+### 對地區和星期幾都做一樣的事(等一下要攤平)
+```{r}
+Dcard2$area = as.character(Dcard2$area)
+ar0=which(Dcard2$area==0)
+Dcard2[ar0,'area'] ='其他地區'
+
+ar1=which(Dcard2$area==1)
+Dcard2[ar1,'area'] ='北區'
+
+ar2=which(Dcard2$area==2)
+Dcard2[ar2,'area'] ='中區'
+
+ar3=which(Dcard2$area==3)
+Dcard2[ar3,'area'] ='南區'
+
+ar4=which(Dcard2$area==4)
+Dcard2[ar4,'area'] ='東區'
+
+ar5=which(Dcard2$area==5)
+Dcard2[ar5,'area'] ='離島區'
+
+Dcard2$weekday = as.character(Dcard2$weekday)
+we1=which(Dcard2$weekday==1)
+Dcard2[we1,'weekday'] ='星期一'
+
+we2=which(Dcard2$weekday==2)
+Dcard2[we2,'weekday'] ='星期二'
+
+we3=which(Dcard2$weekday==3)
+Dcard2[we3,'weekday'] ='星期三'
+we4=which(Dcard2$weekday==4)
+Dcard2[we4,'weekday'] ='星期四'
+we5=which(Dcard2$weekday==5)
+Dcard2[we5,'weekday'] ='星期五'
+we6=which(Dcard2$weekday==6)
+Dcard2[we6,'weekday'] ='星期六'
+we7=which(Dcard2$weekday==7)
+Dcard2[we7,'weekday'] ='星期日'
+rm(ar0,ar1,ar2,ar3,ar4,ar5,we1,we2,we3,we4,we5,we6,we7)
+```
+
+###
+```{r}
+library(jiebaR)
+library(tm)
+library(tmcn) 
+library(jsonlite)
+work_user<-worker(user="C:/Users/Student/Desktop/5-模型建立/RawData/FO.csv",                  stop_word="C:/Users/Student/Desktop/5-模型建立/RawData/stop2.csv")
+
+Dcard2$content = as.character(Dcard2$content)
+xtext2 = lapply(Dcard2$content,segment,jiebar=work_user)
+Dcard2$content2 = xtext2 
+Dcard2$content2 = as.character(Dcard2$content2)
+Dcard2$content2 <-gsub("c","",Dcard2$content2) #把c去掉
+Dcard2$content2 <-gsub('[(.*)]' , "" , Dcard2$content2) #把括號()清掉
+Dcard2$content2 <-gsub("\"" , "",Dcard2$content2) #把"去掉
+Dcard2$content2 <-gsub(',',"、",Dcard2$content2) #把,換成、
+Dcard2$content2 <-gsub(" ","",Dcard2$content2) #把空格去掉
+
+Dcard2$nchar1 =nchar(Dcard2$content)  #原文字元數
+Dcard2$nchar2 =nchar(Dcard2$content2) #有效字元數
+```
+
+### 對類別欄位攤平-機器學習要攤平
+```{r}
+library(nnet)
+Dcard3<- as.data.frame(cbind(Dcard2, 
+                         class.ind(Dcard2$weekday),
+                         class.ind(Dcard2$gender),
+                         class.ind(Dcard2$area),
+                         class.ind(Dcard2$time)))
+
+Dcard4 = Dcard3[ ,c(9,8,11,12,13,14,15,16,17,18,19,22,23,24,25,26,27,28,29,30,31,32,33)]
+rm(Dcard2,Dcard3,xtext2)
+```
+
+### 加入TF-IDF 關鍵字
+```{r}
+library(stringr)
+Dcard4$chocolate <-as.integer(str_count(Dcard4$content,"巧克力"))
+Dcard4$cookie <- as.integer(str_count(Dcard4$content,"餅乾"))
+Dcard4$butter <- as.integer(str_count(Dcard4$content,"奶油"))
+Dcard4$strawberry <- as.integer(str_count(Dcard4$content,"草莓"))
+Dcard4$cheese <- as.integer(str_count(Dcard4$content,"乳酪"))
+Dcard4$milk <- as.integer(str_count(Dcard4$content,"牛奶"))
+Dcard4$egg <- as.integer(str_count(Dcard4$content,"蛋"))
+Dcard4$coffee <- as.integer(str_count(Dcard4$content,"咖啡"))
+Dcard4$lemon <- as.integer(str_count(Dcard4$content,"檸檬"))
+Dcard4$beef <- as.integer(str_count(Dcard4$content,"牛肉"))
+
+Dcard5 = Dcard4[ ,-2]
+#rm(Dcard4)
+```
+
+### 分訓練、測試資料
+```{r}
+library(caTools)
+set.seed(11)
+split =sample.split(Dcard5$heart , SplitRatio =0.8)
+trainingset = subset(Dcard5, subset =(split==TRUE) )
+testset = subset(Dcard5, subset =(split==FALSE) )
+rm(split)
+```
+
+
+### 1.先用 glmnet() 建立基本的Lasso模型
+```{r}
+library(lasso2)
+library(glmnet)
+library(stats)
+lasso1 = glmnet(x = as.matrix(trainingset[, -1]), 
+                y = trainingset[, 1],
+                #lambda = 0.1, #lambda像是懲罰值，是誤差項的係數
+                alpha = 1, #0(Ridge)  1(Lasso)。
+                family = "gaussian")
+plot(lasso1, xvar='lambda', main="Lasso")
+```
+
+
+### 2.用 cv.glmnet() 找出最佳的懲罰值best.lambda
+```{r}
+cv.lasso = cv.glmnet(x = as.matrix(trainingset[, -1]), 
+                     y = trainingset[, 1], 
+                     alpha = 1,  #Lasso
+                     family = "gaussian")
+best.lasso.lambda = cv.lasso$lambda.min
+
+plot(lasso1, xvar='lambda', main="Lasso")
+abline(v=log(best.lasso.lambda), col="red", lty=5.5 )
+```
+
+###  用predict()進行預測
+```{r}
+lasso.test = predict(lasso1, 
+                     s = best.lasso.lambda, 
+                     newx = as.matrix(testset[, -1]))
+```
+
+### 看Lasso迴歸模型的R_squared
+```{r}
+#寫一個R_squared函數
+R_squared <- function(actual, predict){
+  mean_of_obs <- rep(mean(actual), length(actual))
+  
+  SS_tot <- sum((actual - mean_of_obs)^2)
+  SS_reg <- sum((predict - mean_of_obs)^2)
+  #SS_res <- sum((actual - predict)^2)
+  R_squared <- SS_reg/SS_tot   #1 - (SS_res/SS_tot)
+  R_squared
+}
+
+R_squared(testset$heart, lasso.test)
+```
+
+### 好像加太多沒必要的變數了
