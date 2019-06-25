@@ -11,8 +11,8 @@ engine <- dbConnect(RMySQL::MySQL(),
                     host = "192.168.35.119",
                     port = 3306,
                     dbname = "dcard_db",
-                    user = "derek",
-                    password = "derek"
+                    user = "henry",
+                    password = "henry"
 )
 
 dbSendQuery(engine, 'set character set "Big5"'); #要先Send才能下一行的Get

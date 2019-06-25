@@ -98,6 +98,7 @@ library(tmcn)
 library(jsonlite)
 work_user<-worker(user="C:/Users/Student/Desktop/5-模型建立/RawData/FO.csv",                  stop_word="C:/Users/Student/Desktop/5-模型建立/RawData/stop2.csv")
 
+Dcard2$content = as.character(Dcard2$content)
 xtext2 = lapply(Dcard2$content,segment,jiebar=work_user)
 Dcard2$content2 = xtext2 
 Dcard2$content2 = as.character(Dcard2$content2)

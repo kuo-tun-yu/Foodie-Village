@@ -91,7 +91,7 @@ Dcard2[we7,'weekday'] ='星期日'
 rm(ar0,ar1,ar2,ar3,ar4,ar5,we1,we2,we3,we4,we5,we6,we7)
 ```
 
-###
+### 增加字元數欄位
 ```{r}
 library(jiebaR)
 library(tm)
@@ -155,7 +155,7 @@ rm(split)
 
 ### 準備做XGBoost
 ```{r}
-data.y <- Dcard5$heart
+data.y <- Dcard5[ ,1]
 data.n <- Dcard5[ ,-1]
 
 #分訓練測試資料 sample函數 從1:nrow(data)中 隨機挑選80%
@@ -167,7 +167,7 @@ test_set.x <- data.n[-select,]
 test_set.y <- data.y[-select] #測試資料的y
 ```
 
-
+### XGBoost建模前準備，可以玩玩參數
 ```{r}
 library(xgboost)
 
@@ -181,30 +181,42 @@ dtest <- xgb.DMatrix(data = as.matrix(test_set.x))
 
 #設定參數
 xgb.params = list(
-  #col的抽樣比例，越高表示每棵樹使用的col越多，會增加每棵小樹的複雜度
+  #生成新樹時的欄抽樣比例，越高代表每棵樹使用的欄就越多，增加小樹的複雜度
   colsample_bytree = 0.5,                    
-  #row的抽樣比例，越高表示每棵樹使用的col越多，會增加每棵小樹的複雜度
-  subsample = 0.5,                      
+  
+  subsample = 0.5,  
+  #subsample是隨機採樣訓練樣本(防止Overfitting)              
   booster = "gbtree",
-  #樹的最大深度，越高表示模型可以長得越深，模型複雜度越高
+  #max_depth是樹的最大深度，越高模型複雜度(小心Overfitting)
   max_depth = 2,           
   #boosting會增加被分錯的數據權重，而此參數是讓權重不會增加的那麼快，因此越大會讓模型愈保守
-  eta = 0.04,
-  # 或用'mae'也可以
-  eval_metric = "rmse",                      
-  objective = "reg:linear",
-  #越大，模型會越保守，相對的模型複雜度比較低
+  eta = 0.04, #eta(或用'mae'也可)是學習率
+  
+  #eval_metric是驗證資料評估指標 
+  #'auc'曲線下面積
+  #"rmse"像是回歸的均方差
+  #'map' Mean average precision 平均準確度
+  #'logloss' 對數損失，負概似估計
+  eval_metric = "rmse",            
+  objective = "reg:linear", 
+  #objective要看Y，reg:linear是對Y回歸 輸出數字
+  #'reg:logistic' 是羅吉斯回歸 輸出類別(1,0)，
+  #'binary:logistic' 是羅吉斯回歸 輸出機率
+  #'multi:softmax'   多分類的問题
+  
   gamma = 0)
+  #gamma越大，模型會越保守，相對的模型複雜度比較低
+
 
 #先用xgb.cv()函數 為了知道建多少棵樹最好(重點!!))
 cv.model = xgb.cv(
   params = xgb.params, 
   data = dtrain, #丟訓練資料
-  nfold = 5,     # 5-fold cv
+  nfold = 5,     # 5-fold cv,將資料切成五塊，輪流當測試資料
   nrounds=200,   # 各個樹總數下的模型 嘗試種200棵樹
   # 如果當nrounds <30時，就已經有過度擬合情況發生，那表示不用繼續調下去了，可以提早停止
   early_stopping_rounds = 30, 
-  print_every_n = 50 # 每20顯示1次
+  print_every_n = 100 # 每50顯示1次
 )
 
 tmp <- cv.model$evaluation_log #把log先存起來

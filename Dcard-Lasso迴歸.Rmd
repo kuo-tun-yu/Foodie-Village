@@ -162,31 +162,42 @@ rm(split)
 library(lasso2)
 library(glmnet)
 library(stats)
+
+## glmnet函數x要給矩陣型態,第一欄不要因為是y值
 lasso1 = glmnet(x = as.matrix(trainingset[, -1]), 
                 y = trainingset[, 1],
                 #lambda = 0.1, #lambda像是懲罰值，是誤差項的係數
                 alpha = 1, #0(Ridge)  1(Lasso)。
                 family = "gaussian")
+#family參數的值要看Y，Y是連續值就用"gaussian"
+#Y是二元就用"binomial"，Y是多元分類就用"multinomial"
+
 plot(lasso1, xvar='lambda', main="Lasso")
 ```
 
 
 ### 2.用 cv.glmnet() 找出最佳的懲罰值best.lambda
 ```{r}
+#cv就是Cross Validation(交叉驗證)
+#資料分成多份，每一份輪流當驗證資料
+library(glmnet)
 cv.lasso = cv.glmnet(x = as.matrix(trainingset[, -1]), 
                      y = trainingset[, 1], 
                      alpha = 1,  #Lasso
                      family = "gaussian")
+#找cv.lasso的lamda最小值，就是最佳的lambda
 best.lasso.lambda = cv.lasso$lambda.min
 
 plot(lasso1, xvar='lambda', main="Lasso")
+
+#abline用來畫輔助線
 abline(v=log(best.lasso.lambda), col="red", lty=5.5 )
 ```
 
 ###  用predict()進行預測
 ```{r}
 lasso.test = predict(lasso1, 
-                     s = best.lasso.lambda, 
+                     s = best.lasso.lambda ,#s放最佳lambda值 
                      newx = as.matrix(testset[, -1]))
 ```
 
