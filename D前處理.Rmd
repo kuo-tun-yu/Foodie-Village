@@ -126,6 +126,7 @@ rm(Dcard2,Dcard3,xtext2)
 
 ### 加入TF-IDF 關鍵字
 ```{r}
+library(stringr)
 Dcard4$chocolate <-as.integer(str_count(Dcard4$content,"巧克力"))
 Dcard4$cookie <- as.integer(str_count(Dcard4$content,"餅乾"))
 Dcard4$butter <- as.integer(str_count(Dcard4$content,"奶油"))
