@@ -174,5 +174,5 @@ svr.pred = predict(clf1, trainingset[-1])
 
 head(svr.pred)
 ```
-
+123
 ## SVR好像也不太準
